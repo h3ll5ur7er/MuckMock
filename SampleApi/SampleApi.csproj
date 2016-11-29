@@ -40,6 +40,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CodeUnderTest.cs" />
     <Compile Include="ISampleBaseInterface.cs" />
     <Compile Include="SampleClass.cs" />
     <Compile Include="ISampleInterface.cs" />

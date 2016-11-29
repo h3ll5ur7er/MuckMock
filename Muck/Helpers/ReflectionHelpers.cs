@@ -17,6 +17,24 @@ namespace Muck
             return o.GetCustomAttributes(typeof(TAtt)).Cast<TAtt>();
         }
         
+        internal static object Cast(this object o, Type targetType)
+        {
+            return typeof(ReflectionHelpers).GetMethod("CastT").MakeGenericMethod(targetType).Invoke(null, new []{o});
+        }
+        private static T CastT<T>(object o)
+        {
+            return (T)o;
+        }
+        internal static object SecureCast(this object o, Type targetType)
+        {
+            if(targetType.IsClass)
+            return typeof(ReflectionHelpers).GetMethod("CastT").MakeGenericMethod(targetType).Invoke(null, new []{o});
+            throw new ArgumentException("targetType of SecureCast has to be a class");
+        }
+        private static T SecureCastT<T>(object o) where T : class
+        {
+            return o as T;
+        }
         internal static object Default(this Type t)
         {
             return typeof(ReflectionHelpers).GetMethod("DefaultT").MakeGenericMethod(t).Invoke(null, null);

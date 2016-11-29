@@ -128,10 +128,13 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Helpers\Log.cs" />
     <Compile Include="Mock\Mock.cs" />
     <Compile Include="Mock\MockImplementationAttribute.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Helpers\ReflectionHelpers.cs" />
+    <Compile Include="TestRunner\Assert.cs" />
+    <Compile Include="TestRunner\AssertFailedException.cs" />
     <Compile Include="TestRunner\RunAttribute.cs" />
     <Compile Include="Mock\RuntimeCompiler.cs" />
     <Compile Include="TestRunner\TestAttribute.cs" />

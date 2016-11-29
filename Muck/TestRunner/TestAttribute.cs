@@ -13,5 +13,10 @@ namespace Muck
             Name = name;
             Target = target;
         }
+
+        public override string ToString()
+        {
+            return $"<:: {Target.Name} ::> {Name}";
+        }
     }
 }
