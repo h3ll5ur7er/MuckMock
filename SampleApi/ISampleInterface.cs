@@ -20,4 +20,16 @@ namespace SampleApi
         [MockImplementation("return inout;")]
         string FunctionWithInputAndReturnValue(string inout);
     }
+    public interface ISampleInterface2 : ISampleBaseInterface
+    {
+        string Name { get; set; }
+        int Value { get; set; }
+        void Function();
+        
+        string FunctionWithReturnValue();
+        
+        void FunctionWithInput(string input);
+        
+        string FunctionWithInputAndReturnValue(string inout);
+    }
 }

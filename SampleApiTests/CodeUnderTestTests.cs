@@ -5,9 +5,13 @@ using SampleApi;
 namespace SampleApiTests
 {
     [Test(typeof(CodeUnderTest), "CodeUnderTestTests")]
+    [Test(typeof(CodeUnderTest), "CodeUnderTestTestsFail")]
+    [Test(typeof(CodeUnderTest), "CodeUnderTestTestsSuccess")]
     public class CodeUnderTestTests
     {
         [Run("MockObjectTest1", testName: "CodeUnderTestTests", expected:"Hello from Mock")]
+        [Run("MockObjectTest1", testName: "CodeUnderTestTestsFail", expected:"Hello from Mock")]
+        [Run("MockObjectTest1", testName: "CodeUnderTestTestsSuccess", expected:"Hello from Mock")]
         public string MockObjectNameTest1()
         {
             var mock = Mock.Create<ISampleInterface>();
@@ -17,6 +21,8 @@ namespace SampleApiTests
         }
 
         [Run("MockObjectTest2", testName: "CodeUnderTestTests", param:"Hello from Mock")]
+        [Run("MockObjectTest2", testName: "CodeUnderTestTestsFail", param:"BlaBla")]
+        [Run("MockObjectTest2", testName: "CodeUnderTestTestsSuccess", param:"Hello from Mock")]
         public void MockObjectNameTest2(string expected)
         {
             var mock = Mock.Create<ISampleInterface>();
@@ -24,26 +30,40 @@ namespace SampleApiTests
             var actual = cut.Value.Name;
             expected.AssertEquals(actual);
         }
-
-        [Run("MockObjectTest3.1", testName: "CodeUnderTestTests", param:42, expected: "42")]
-        [Run("MockObjectTest3.2", testName: "CodeUnderTestTests", param:13, expected: "13")]
-        [Run("MockObjectTest3.3", testName: "CodeUnderTestTests", param:-1, expected: "-1")]
-        [Run("MockObjectTest3.4", testName: "CodeUnderTestTests", param:0, expected: "0")]
-        [Run("MockObjectTest3.5", testName: "CodeUnderTestTests", param:666, expected: "666")]
-        public string MockObjectReturnTest3(string expected = "")
+        
+        [Run("MockObjectTest3.1", testName: "CodeUnderTestTests", expected:"Hello from Mock")]
+        [Run("MockObjectTest3.1", testName: "CodeUnderTestTestsSuccess", expected:"Hello from Mock")]
+        [Run("MockObjectTest3.1", testName: "CodeUnderTestTestsFail", expected:"FooBar")]
+        public string MockObjectNameTest3_1()
         {
-            var cut = new CodeUnderTest();
-
-            var actual = cut.Return(int.Parse(expected));
-            expected.ToString().AssertEquals(actual);
+            var mock = Mock.Create<ISampleInterface>();
+            var cut = new CodeUnderTest(mock);
+            var actual = cut.Value.Name;
             return actual;
         }
 
-        [Run("MockObjectTest4", testName: "CodeUnderTestTests", expectedExceptionType:typeof(NotImplementedException))]
+        [Run("MockObjectTest3.2", testName: "CodeUnderTestTests", param:"Hello from Mock")]
+        [Run("MockObjectTest3.2", testName: "CodeUnderTestTests", param:"Hello from Mock")]
+        [Run("MockObjectTest3.2", testName: "CodeUnderTestTests", param:"FooBar")]
+        public void MockObjectNameTest3_2(string expected)
+        {
+            var mock = Mock.Create<ISampleInterface>();
+            var cut = new CodeUnderTest(mock);
+            var actual = cut.Value.Name;
+            expected.AssertEquals(actual);
+        }
+        
+        [Run("MockObjectTest4.1", testName: "CodeUnderTestTests")]
+        [Run("MockObjectTest4.2", testName: "CodeUnderTestTests", expectedExceptionType:typeof(NotImplementedException))]
+        [Run("MockObjectTest4.3", testName: "CodeUnderTestTests", expectedExceptionType:typeof(ArgumentException))]
         public void MockObjectReturnTest4()
         {
             var cut = new CodeUnderTest();
             cut.Throw();
+        }
+        [Run("MockObjectTest4.4", testName: "CodeUnderTestTests", expectedExceptionType:typeof(NotImplementedException))]
+        public void MockObjectReturnTest4_()
+        {
         }
     }
 }

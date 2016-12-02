@@ -9,14 +9,20 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace Muck
 {
+    public interface IDynamicMockObject
+    {
+        DynamicClassInvokeCounter InvokeCounter { get; }
+    }
+
     internal static class RuntimeCompiler
     {
         public static IDynamicSourceItem CreateClassFor<T>()
         {
             var t = typeof(T);
+            var name = t.Name + "__MockImpl";
             var classItems = new List<IDynamicSourceItem>();
             classItems.AddRange(Type(t));
-            return new DynamicClass(t.Name+"__Impl__Dynamic", t.FullName, null, classItems.ToArray());
+            return new DynamicClass(name, t.FullName, new []{"Muck.IDynamicMockObject"}, classItems.ToArray());
         }
 
         private static IEnumerable<IDynamicSourceItem> Type(Type t)
@@ -68,7 +74,7 @@ namespace Muck
         public static Assembly CompileDynamicClass(IDynamicSourceItem @class, params MetadataReference[] refs)
         {
             var sourceCode = @class.Render();
-
+            Log.Instance.AppendLine(sourceCode,6, ConsoleColor.Cyan);
             var st = CSharpSyntaxTree.ParseText(sourceCode);
             string an = Path.GetRandomFileName();
             MetadataReference[] references = new MetadataReference[]
@@ -78,20 +84,19 @@ namespace Muck
                 MetadataReference.CreateFromFile(typeof(Mock).Assembly.Location)
             }.Concat(refs).ToArray();
 
-            CSharpCompilation compilation = CSharpCompilation.Create(
+            CSharpCompilation assembly = CSharpCompilation.Create(
                 an,
                 syntaxTrees: new[] { st },
                 references: references,
                 options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
             using (var dllStream = new MemoryStream())
             using (var pdbStream = new MemoryStream())
-            using (var docStream = new MemoryStream())
             {
-                var result = compilation.Emit(dllStream, pdbStream, docStream);
+                var result = assembly.Emit(dllStream, pdbStream);
 
                 if (result.Success)
                 {
-                    return Assembly.Load(dllStream.ToArray());
+                    return Assembly.Load(dllStream.ToArray(),pdbStream.ToArray());
                 }
                 else
                 {
@@ -145,15 +150,14 @@ namespace Muck
                 SignaturePattern = string.IsNullOrWhiteSpace(BaseClass)
                     ? (interfaces == null || interfaces.Length == 0 ? SignaturePatternWithoutInheritance : SignaturePatternWithoutBaseClass)
                     : (interfaces == null || interfaces.Length == 0 ? SignaturePatternWithoutInterfaces : DefaultSignaturePattern);
-
-                //BodyItems.Add(new DynamicProperty());
+                BodyItems.Add(new DynamicCounter("InvokeCounter"));
 
             }
 
             public string Render()
             {
                 var sig = string.Format(SignaturePattern, Name, BaseClass, string.Join(", ", Interfaces??new string[] {}));
-                return $"{sig}\r\n{{\r\n\t{string.Join("\r\n\t", BodyItems.Select(x => x.Render()))}\r\n}}";
+                return $"{sig}\r\n{{\r\n\t{string.Join("\r\n\t", BodyItems.Select(x => x.Render()).Distinct())}\r\n}}";
             }
         }
 
@@ -169,6 +173,33 @@ namespace Muck
             {
                 Name = name;
                 Type = type;
+                DefaultValue = string.IsNullOrWhiteSpace(defaultValue)?"":" = "+defaultValue+"";
+                HasGetter = hasGetter;
+                HasSetter = hasSetter;
+            }
+
+            public string Render()
+            {
+                var field = $"private {Type} _{Name}{DefaultValue};";
+                var property = HasGetter
+                    ? HasSetter ? $"public {Type} {Name} {{ get{{InvokeCounter[Muck.DynamicClassContentType.Property][\"{Name}_Get\"]++;return _{Name};}} set{{InvokeCounter[Muck.DynamicClassContentType.Property][\"{Name}_Set\"]++;_{Name} = value;}} }}" : $"public {Type} {Name} {{ get{{InvokeCounter[Muck.DynamicClassContentType.Property][\"{Name}_Get\"]++;return _{Name};}} }}"
+                    : HasSetter ? $"public {Type} {Name} {{ set{{InvokeCounter[Muck.DynamicClassContentType.Property][\"{Name}_Set\"]++;_{Name} = value;}} }}" : "";
+                return $"{field}\r\n\t{property}";
+            }
+        }
+
+        public class DynamicIndexer : IDynamicSourceItem
+        {
+            public string Name { get; set; }
+            public string Type { get; set; }
+            public string DefaultValue { get; set; }
+            public bool HasGetter { get; set; }
+            public bool HasSetter { get; set; }
+
+            public DynamicIndexer(string name, string type, string defaultValue = null, bool hasGetter = true, bool hasSetter = true)
+            {
+                Name = name;
+                Type = type;
                 DefaultValue = string.IsNullOrWhiteSpace(defaultValue)?"":" = "+defaultValue+";";
                 HasGetter = hasGetter;
                 HasSetter = hasSetter;
@@ -176,9 +207,27 @@ namespace Muck
 
             public string Render()
             {
+                throw new NotImplementedException();
                 return HasGetter
                     ? HasSetter ? $"public {Type} {Name} {{ get; set; }}{DefaultValue}" : $"public {Type} {Name} {{ get; }}{DefaultValue}"
                     : HasSetter ? $"public {Type} {Name} {{ set; }}" : "";
+            }
+        }
+
+        public class DynamicCounter : IDynamicSourceItem
+        {
+            public string Name { get; set; }
+
+            public DynamicCounter(string name)
+            {
+                Name = name;
+            }
+
+            public string Render()
+            {
+                var field =  $"public {typeof(DynamicClassInvokeCounter).FullName} {Name} {{ get; }} = new {typeof(DynamicClassInvokeCounter).FullName}();";
+                var indexer =  $"public int this[{typeof(DynamicClassContentType).FullName} memberType, string name] {{ get{{return {Name}[memberType][name];}} set{{{Name}[memberType][name]=value;}} }}";
+                return  $"{field}";
             }
         }
 
@@ -201,7 +250,8 @@ namespace Muck
 
             public string Render()
             {
-                return $"public {Type} {Name}({string.Join(", ", Parameters.Select(x => x.ToString()))}) {{ {Body} }}";
+                    
+                return $"public {Type} {Name}({string.Join(", ", Parameters.Select(x => x.ToString()))}) {{ InvokeCounter[Muck.DynamicClassContentType.Method][\"{Name}\"]++;{Body} }}";
             }
         }
 
@@ -222,7 +272,7 @@ namespace Muck
 
             public string Render()
             {
-                return $"public {Name}({string.Join(", ", Parameters.Select(x => x.ToString()))}) {{ {Body} }}";
+                return $"public {Name}({string.Join(", ", Parameters.Select(x => x.ToString()))}) {{ InvokeCounter[Muck.DynamicClassContentType.Constructor][\"{Name}\"]++;{Body} }}";
             }
         }
 
@@ -248,5 +298,65 @@ namespace Muck
                 return $"{Type} {Name}";
             }
         }
+
+    }
+    public class DynamicClassInvokeCounter : Dictionary<DynamicClassContentType, InvokeCounter>
+    {
+        public new InvokeCounter this[DynamicClassContentType key]
+        {
+            get
+            {
+                if(!ContainsKey(key))
+                    Add(key, new InvokeCounter());
+                return base[key];
+            }
+            set
+            {
+                if(!ContainsKey(key))
+                    Add(key, new InvokeCounter());
+                base[key] = value;
+            }
+        }
+
+        public override string ToString()
+        {
+            return string.Join("\r\n", this.OrderByDescending(x=>x.Value.Count).Select(x=>$"{x.Key}:\r\n\t{x.Value}"));
+        }
+    }
+
+    public class InvokeCounter : Dictionary<string, int>
+    {
+        public new int this[string key]
+        {
+            get
+            {
+                if(!ContainsKey(key))
+                    Add(key, 0);
+                return base[key];
+            }
+            set
+            {
+                if(!ContainsKey(key))
+                    base.Add(key, 0);
+                base[key]+=value;
+            }
+        }
+
+        public override string ToString()
+        {
+            return ToString("\r\n\t");
+        }
+
+        public string ToString(string sep)
+        {
+            return string.Join(sep, this.OrderByDescending(x=>x.Value).Select(x=>$"{x.Key} : {x.Value}"));
+        }
+    }
+
+    public enum DynamicClassContentType
+    {
+        Property,
+        Constructor,
+        Method,
     }
 }

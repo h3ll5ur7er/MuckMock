@@ -16,17 +16,54 @@ namespace SampleApiTests
         {
             var mock = Mock.Create<ISampleInterface>();
 
+            Assert.MockCallCount(mock, DynamicClassContentType.Method, "Function", 0);
             mock.Function();
+            Assert.MockCallCount(mock, DynamicClassContentType.Method, "Function", 1);
             mock.FunctionWithInput("Test");
             var v1 = mock.FunctionWithReturnValue();
             var v2 = mock.FunctionWithInputAndReturnValue("Test");
-            Console.WriteLine(v1);
-            Console.WriteLine(v2);
-            Console.WriteLine(mock.Name);
-            Console.WriteLine(mock.Value);
-            Console.WriteLine(mock.Inherited);
-            Console.WriteLine(mock.InheritedFunction(42));
-            Console.WriteLine();
+        }
+    }
+
+    [Test(typeof(ISampleInterface), "ISampleInterfaceTests")]
+    public class ISampleInterface2Tests
+    {
+        [Run("MockObjectTest", testName:"ISampleInterfaceTests")]
+        public void MockObject_InvokeCounter_FunctionCallIncrementsCounter()
+        {
+            var mock = Mock.Create<ISampleInterface2>();
+
+            Assert.MockCallCount(mock, DynamicClassContentType.Method, "Function", 0);
+            mock.Function();
+            Assert.MockCallCount(mock, DynamicClassContentType.Method, "Function", 1);
+            mock.FunctionWithInput("Test");
+            var v1 = mock.FunctionWithReturnValue();
+            var v2 = mock.FunctionWithInputAndReturnValue("Test");
+        }
+
+        [Run("MockObjectTest", testName:"ISampleInterfaceTests")]
+        public void AssertMockCallCount_CorrectNumberExpected_Passes()
+        {
+            var mock = Mock.Create<ISampleInterface2>();
+
+            Assert.MockCallCount(mock, DynamicClassContentType.Method, "Function", 0);
+            mock.Function();
+            Assert.MockCallCount(mock, DynamicClassContentType.Method, "Function", 1);
+            mock.FunctionWithInput("Test");
+            var v1 = mock.FunctionWithReturnValue();
+            var v2 = mock.FunctionWithInputAndReturnValue("Test");
+        }
+        [Run("MockObjectTest", testName:"ISampleInterfaceTests", expectedExceptionType:typeof(AssertFailedException), expectedExceptionMessage:"expected")]
+        public void MockObject_InvokeCounter_CorrectNumberExpected_Passes()
+        {
+            var mock = Mock.Create<ISampleInterface2>();
+
+            Assert.MockCallCount(mock, DynamicClassContentType.Method, "Function", 0);
+            mock.Function();
+            Assert.MockCallCount(mock, DynamicClassContentType.Method, "Function", 2, "expected");
+            mock.FunctionWithInput("Test");
+            var v1 = mock.FunctionWithReturnValue();
+            var v2 = mock.FunctionWithInputAndReturnValue("Test");
         }
     }
 }

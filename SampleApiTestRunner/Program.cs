@@ -12,10 +12,8 @@ namespace SampleApiTestRunner
     {
         static void Main(string[] args)
         {
-            var result = TestRunner.RunTests(Assembly.GetAssembly(typeof(SampleApiTests.ISampleInterfaceTests)));
-            Console.Clear();
-            Console.SetCursorPosition(0,0);
-            Console.WriteLine(result);
+            TestRunner.RunTests(Assembly.GetAssembly(typeof(SampleApiTests.ISampleInterfaceTests)));
+
             Console.ReadKey();
         }
     }
