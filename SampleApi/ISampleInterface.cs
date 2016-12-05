@@ -1,4 +1,5 @@
-﻿using Muck;
+﻿using System;
+using Muck;
 
 namespace SampleApi
 {
@@ -31,5 +32,13 @@ namespace SampleApi
         void FunctionWithInput(string input);
         
         string FunctionWithInputAndReturnValue(string inout);
+    }
+
+    public delegate int StringIntDelegate(string s);
+
+    public interface ISampleInterface3
+    {
+        event EventHandler TestEvent1; 
+        event StringIntDelegate TestEvent2; 
     }
 }

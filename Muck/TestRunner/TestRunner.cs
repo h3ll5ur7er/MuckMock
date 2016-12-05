@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -146,6 +147,12 @@ namespace Muck
             Console.Clear();
             Console.SetCursorPosition(0,0);
             Log.Print(logLevel);
+            Console.ReadKey();
+            Console.Clear();
+            Console.SetCursorPosition(0,0);
+            var html = Log.Html(logLevel);
+            Console.WriteLine(html);
+            File.WriteAllText(@"c:\temp\foobar.html", html);
         }
         
         private static object MethodExecutionProxy(this MethodInfo method, object instance, params object[] param)

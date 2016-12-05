@@ -129,8 +129,16 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Helpers\Log.cs" />
+    <Compile Include="Mock\DynamicClassContentType.cs" />
+    <Compile Include="Mock\DynamicClassInvokeCounter.cs" />
+    <Compile Include="Mock\DynamicSourceItems.cs" />
+    <Compile Include="Mock\EventController.cs" />
+    <Compile Include="Mock\IDynamicMockObject.cs" />
+    <Compile Include="Mock\InvokeCounter.cs" />
+    <Compile Include="Mock\IObservableEvent.cs" />
     <Compile Include="Mock\Mock.cs" />
     <Compile Include="Mock\MockImplementationAttribute.cs" />
+    <Compile Include="Mock\ObservableEvent.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Helpers\ReflectionHelpers.cs" />
     <Compile Include="TestRunner\Assert.cs" />

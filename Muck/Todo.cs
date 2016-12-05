@@ -1,5 +1,4 @@
-﻿//TODO: Include Events in dynamically created classes
-//TODO: Exception Catching in Test runner
-//TODO: Support Generics
+﻿//TODO: Support Generics
 //TODO: Test Muck
-//TODO: Assert mechanism
+//TODO: Improve Documentation
+//TODO: Output Html

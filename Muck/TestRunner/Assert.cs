@@ -28,5 +28,20 @@ namespace Muck
                 return;
             throw new AssertFailedException(expectedCallCount, callCount, "MockCallCount", message, callerFile, callerName, callerLine);
         }
+
+        public static void MockEventHandlerAdded(object mock, string eventName, string message ="", [CallerFilePath]string callerFile = null, [CallerMemberName]string callerName = null, [CallerLineNumber]int callerLine = -1)
+        {
+            var callCount = Mock.CallCount(mock, DynamicClassContentType.Event, eventName+"_Add");
+            if (callCount >0)
+                return;
+            throw new AssertFailedException(2, callCount, "MockEventHandlerAdded", message, callerFile, callerName, callerLine);
+        }
+        public static void MockEventHandlerRemoved(object mock, string eventName, string message ="", [CallerFilePath]string callerFile = null, [CallerMemberName]string callerName = null, [CallerLineNumber]int callerLine = -1)
+        {
+            var callCount = Mock.CallCount(mock, DynamicClassContentType.Event, eventName+"_Remove");
+            if (callCount >1)
+                return;
+            throw new AssertFailedException(2, callCount, "MockEventHandlerAdded", message, callerFile, callerName, callerLine);
+        }
     }
 }

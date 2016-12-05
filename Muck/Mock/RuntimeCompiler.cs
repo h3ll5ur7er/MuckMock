@@ -9,12 +9,7 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace Muck
 {
-    public interface IDynamicMockObject
-    {
-        DynamicClassInvokeCounter InvokeCounter { get; }
-    }
-
-    internal static class RuntimeCompiler
+    internal static partial class RuntimeCompiler
     {
         public static IDynamicSourceItem CreateClassFor<T>()
         {
@@ -27,7 +22,7 @@ namespace Muck
 
         private static IEnumerable<IDynamicSourceItem> Type(Type t)
         {
-            return Properties(t).Concat(Constructors(t)).Concat(Methods(t)).Concat(BaseType(t.GetInterfaces()));
+            return Methods(t).Concat(Constructors(t)).Concat(Properties(t)).Concat(Events(t)).Concat(BaseType(t.GetInterfaces()));
         }
 
         private static IEnumerable<IDynamicSourceItem> BaseType(Type[] t)
@@ -36,7 +31,7 @@ namespace Muck
             var baseImpl = new List<IDynamicSourceItem>();
             foreach (var iface in t)
             {
-               baseImpl.AddRange(Properties(iface).Concat(Methods(iface)).Concat(BaseType(iface.GetInterfaces())));
+               baseImpl.AddRange(Methods(iface).Concat(Properties(iface)).Concat(Events(iface)).Concat(BaseType(iface.GetInterfaces())));
             }
             return baseImpl;
         }
@@ -46,7 +41,7 @@ namespace Muck
             return t.GetConstructors().Select(constructor => new DynamicConstructor(constructor.Name, constructor.GetCustomAttribute<MockImplementationAttribute>()?.Body ?? null, constructor.GetParameters().Select(p=>new DynamicParameter {Type = p.ParameterType.FullName, Name = p.Name}).ToArray())).Cast<IDynamicSourceItem>();
         }
 
-        private static IEnumerable<IDynamicSourceItem> Methods(Type t)
+        private static IEnumerable<IDynamicSourceItem> Properties(Type t)
         {
             return from property in t.GetProperties()
                    where !property.IsSpecialName
@@ -58,7 +53,7 @@ namespace Muck
                        property.CanWrite);
         }
 
-        private static IEnumerable<IDynamicSourceItem> Properties(Type t)
+        private static IEnumerable<IDynamicSourceItem> Methods(Type t)
         {
             return from method in t.GetMethods()
                    where !method.IsSpecialName
@@ -68,6 +63,19 @@ namespace Muck
                        method.GetCustomAttribute<MockImplementationAttribute>()?.Body ?? null,
                        method.GetParameters()
                             .Select(p => new DynamicParameter {Type = p.ParameterType.FullName, Name = p.Name})
+                            .ToArray());
+        }
+
+        private static IEnumerable<IDynamicSourceItem> Events(Type t)
+        {
+            return from evnt in t.GetEvents()
+                   where !evnt.IsSpecialName
+                   select new DynamicEvent(
+                       evnt.Name,
+                       evnt.EventHandlerType.FullName,
+                       evnt.EventHandlerType.GetMethod("Invoke").ReturnType.FullName,
+                       evnt.EventHandlerType.GetMethod("Invoke").GetParameters()
+                            .Select(p => new DynamicParameter { Type = p.ParameterType.FullName, Name = p.Name })
                             .ToArray());
         }
 
@@ -106,257 +114,5 @@ namespace Muck
             }
         }
         
-        internal interface IDynamicSourceItem
-        {
-            string Name { get; }
-            string Render();
-        }
-        internal interface ITypeNamePair
-        {
-            string Type { get; }
-            string Name { get; }
-        }
-
-        internal class PredefinedClass : IDynamicSourceItem
-        {
-            public string Name { get; set; }
-            public string Code { get; set; }
-            public string Render()
-            {
-                return Code;
-            }
-        }
-
-        internal class DynamicClass : IDynamicSourceItem
-        {
-            public string Name { get; }
-            public string BaseClass { get; }
-            public string[] Interfaces { get; }
-            public List<IDynamicSourceItem> BodyItems { get; }
-
-            public string DefaultSignaturePattern { get; } = "public class {0} : {1}, {2}";
-            public string SignaturePatternWithoutBaseClass { get; } = "public class {0} : {2}";
-            public string SignaturePatternWithoutInterfaces { get; } = "public class {0} : {1}";
-            public string SignaturePatternWithoutInheritance { get; } = "public class {0}";
-            public string SignaturePattern { get; }
-
-            public DynamicClass(string name, string baseClass = "", string[] interfaces = null,
-                params IDynamicSourceItem[] bodyItems)
-            {
-                Name = name;
-                BaseClass = baseClass;
-                Interfaces = interfaces;
-                BodyItems = new List<IDynamicSourceItem>(bodyItems);
-                SignaturePattern = string.IsNullOrWhiteSpace(BaseClass)
-                    ? (interfaces == null || interfaces.Length == 0 ? SignaturePatternWithoutInheritance : SignaturePatternWithoutBaseClass)
-                    : (interfaces == null || interfaces.Length == 0 ? SignaturePatternWithoutInterfaces : DefaultSignaturePattern);
-                BodyItems.Add(new DynamicCounter("InvokeCounter"));
-
-            }
-
-            public string Render()
-            {
-                var sig = string.Format(SignaturePattern, Name, BaseClass, string.Join(", ", Interfaces??new string[] {}));
-                return $"{sig}\r\n{{\r\n\t{string.Join("\r\n\t", BodyItems.Select(x => x.Render()).Distinct())}\r\n}}";
-            }
-        }
-
-        public class DynamicProperty : IDynamicSourceItem
-        {
-            public string Name { get; set; }
-            public string Type { get; set; }
-            public string DefaultValue { get; set; }
-            public bool HasGetter { get; set; }
-            public bool HasSetter { get; set; }
-
-            public DynamicProperty(string name, string type, string defaultValue = null, bool hasGetter = true, bool hasSetter = true)
-            {
-                Name = name;
-                Type = type;
-                DefaultValue = string.IsNullOrWhiteSpace(defaultValue)?"":" = "+defaultValue+"";
-                HasGetter = hasGetter;
-                HasSetter = hasSetter;
-            }
-
-            public string Render()
-            {
-                var field = $"private {Type} _{Name}{DefaultValue};";
-                var property = HasGetter
-                    ? HasSetter ? $"public {Type} {Name} {{ get{{InvokeCounter[Muck.DynamicClassContentType.Property][\"{Name}_Get\"]++;return _{Name};}} set{{InvokeCounter[Muck.DynamicClassContentType.Property][\"{Name}_Set\"]++;_{Name} = value;}} }}" : $"public {Type} {Name} {{ get{{InvokeCounter[Muck.DynamicClassContentType.Property][\"{Name}_Get\"]++;return _{Name};}} }}"
-                    : HasSetter ? $"public {Type} {Name} {{ set{{InvokeCounter[Muck.DynamicClassContentType.Property][\"{Name}_Set\"]++;_{Name} = value;}} }}" : "";
-                return $"{field}\r\n\t{property}";
-            }
-        }
-
-        public class DynamicIndexer : IDynamicSourceItem
-        {
-            public string Name { get; set; }
-            public string Type { get; set; }
-            public string DefaultValue { get; set; }
-            public bool HasGetter { get; set; }
-            public bool HasSetter { get; set; }
-
-            public DynamicIndexer(string name, string type, string defaultValue = null, bool hasGetter = true, bool hasSetter = true)
-            {
-                Name = name;
-                Type = type;
-                DefaultValue = string.IsNullOrWhiteSpace(defaultValue)?"":" = "+defaultValue+";";
-                HasGetter = hasGetter;
-                HasSetter = hasSetter;
-            }
-
-            public string Render()
-            {
-                throw new NotImplementedException();
-                return HasGetter
-                    ? HasSetter ? $"public {Type} {Name} {{ get; set; }}{DefaultValue}" : $"public {Type} {Name} {{ get; }}{DefaultValue}"
-                    : HasSetter ? $"public {Type} {Name} {{ set; }}" : "";
-            }
-        }
-
-        public class DynamicCounter : IDynamicSourceItem
-        {
-            public string Name { get; set; }
-
-            public DynamicCounter(string name)
-            {
-                Name = name;
-            }
-
-            public string Render()
-            {
-                var field =  $"public {typeof(DynamicClassInvokeCounter).FullName} {Name} {{ get; }} = new {typeof(DynamicClassInvokeCounter).FullName}();";
-                var indexer =  $"public int this[{typeof(DynamicClassContentType).FullName} memberType, string name] {{ get{{return {Name}[memberType][name];}} set{{{Name}[memberType][name]=value;}} }}";
-                return  $"{field}";
-            }
-        }
-
-        public class DynamicMethod : IDynamicSourceItem
-        {
-            public string Name { get; set; }
-            public string Type { get; set; }
-            public DynamicParameter[] Parameters { get; set; }
-            public string Body { get; set; }
-            public bool HasGetter { get; set; }
-            public bool HasSetter { get; set; }
-
-            public DynamicMethod(string name, string type, string body = null, params DynamicParameter[] parameters)
-            {
-                Parameters = parameters;
-                Type = type == "System.Void" ? "void":type;
-                Body = body??(Type == "void"?"":$"return default({Type});");
-                Name = name;
-            }
-
-            public string Render()
-            {
-                    
-                return $"public {Type} {Name}({string.Join(", ", Parameters.Select(x => x.ToString()))}) {{ InvokeCounter[Muck.DynamicClassContentType.Method][\"{Name}\"]++;{Body} }}";
-            }
-        }
-
-        public class DynamicConstructor : IDynamicSourceItem
-        {
-            public string Name { get; set; }
-            public DynamicParameter[] Parameters { get; set; }
-            public string Body { get; set; }
-            public bool HasGetter { get; set; }
-            public bool HasSetter { get; set; }
-
-            public DynamicConstructor(string name, string body, params DynamicParameter[] parameters)
-            {
-                Parameters = parameters;
-                Body = body;
-                Name = name;
-            }
-
-            public string Render()
-            {
-                return $"public {Name}({string.Join(", ", Parameters.Select(x => x.ToString()))}) {{ InvokeCounter[Muck.DynamicClassContentType.Constructor][\"{Name}\"]++;{Body} }}";
-            }
-        }
-
-        public class DynamicParameter : ITypeNamePair
-        {
-            private string name;
-            private string type;
-
-            public string Name
-            {
-                get { return name; }
-                set { name = value; }
-            }
-
-            public string Type
-            {
-                get { return type; }
-                set { type = value == "System.Void" ? "void" : type = value; }
-            }
-
-            public override string ToString()
-            {
-                return $"{Type} {Name}";
-            }
-        }
-
-    }
-    public class DynamicClassInvokeCounter : Dictionary<DynamicClassContentType, InvokeCounter>
-    {
-        public new InvokeCounter this[DynamicClassContentType key]
-        {
-            get
-            {
-                if(!ContainsKey(key))
-                    Add(key, new InvokeCounter());
-                return base[key];
-            }
-            set
-            {
-                if(!ContainsKey(key))
-                    Add(key, new InvokeCounter());
-                base[key] = value;
-            }
-        }
-
-        public override string ToString()
-        {
-            return string.Join("\r\n", this.OrderByDescending(x=>x.Value.Count).Select(x=>$"{x.Key}:\r\n\t{x.Value}"));
-        }
-    }
-
-    public class InvokeCounter : Dictionary<string, int>
-    {
-        public new int this[string key]
-        {
-            get
-            {
-                if(!ContainsKey(key))
-                    Add(key, 0);
-                return base[key];
-            }
-            set
-            {
-                if(!ContainsKey(key))
-                    base.Add(key, 0);
-                base[key]+=value;
-            }
-        }
-
-        public override string ToString()
-        {
-            return ToString("\r\n\t");
-        }
-
-        public string ToString(string sep)
-        {
-            return string.Join(sep, this.OrderByDescending(x=>x.Value).Select(x=>$"{x.Key} : {x.Value}"));
-        }
-    }
-
-    public enum DynamicClassContentType
-    {
-        Property,
-        Constructor,
-        Method,
     }
 }

@@ -74,6 +74,20 @@ namespace Muck
                 Console.ForegroundColor = temp;
             }
         }
+        public static string Html(int lvl)
+        {
+            var html = "<html>" +
+                       "<head></head>" +
+                       "<body>";
+
+            foreach (var entry in Instance.log.Where(x=>x.Level<=lvl))
+            {
+                html+=entry.ToHtml();
+            }
+            html += "</body></html>";
+
+            return html;
+        }
 
         private class LogEntry
         {
@@ -91,6 +105,18 @@ namespace Muck
             {
                 return $"[{Level}]{Message.PadRight(pad)} @ {Timestamp:yyyy MM dd hh mm ss fff}";
             }
+            public string ToHtml()
+            {
+                return $"<H{Level+1} {Color.ToHtml()}>{Message} <small> @ {Timestamp:yyyy MM dd hh mm ss fff}</small></H{Level + 1}>";
+            }
+        }
+    }
+
+    public static class ColorHelper
+    {
+        public static string ToHtml(this ConsoleColor color)
+        {
+            return $" style=\"color:{color.ToString().ToLower()}\"";
         }
     }
 }

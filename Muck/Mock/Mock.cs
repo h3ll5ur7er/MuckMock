@@ -44,5 +44,19 @@ namespace Muck
                 return -1;
             }
         }
+
+        public static object InvokeEvent(object mock, string name, params object[] param)
+        {
+            try
+            {
+                dynamic mockObject = mock;
+                IDynamicMockObject dMock = mockObject;
+                return dMock.EvtMgr[name].Invoke(param);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
     }
 }
